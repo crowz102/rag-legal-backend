@@ -1,6 +1,10 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from app.schemas.enums import UserRole
-from typing import Optional
+from typing import Optional, Annotated
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 class User(BaseModel):
     username: str
@@ -16,7 +20,9 @@ class UserInDB(User):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_lenght = 6)
+    fullname: str
+    phone: Optional[Annotated[str, StringConstraints(pattern=r'^\+\d{8,15}$')]] = None
+    password: str = Field(min_lenght=6)
 
 class UserOut(User):
     id: int

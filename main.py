@@ -9,18 +9,20 @@ app = FastAPI(
     version="1.0.0"
 )
 
-app.include_router(auth.router, prefix="/auth")
+# Include routers
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router)
 app.include_router(chats.router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ✅ Custom OpenAPI để hiển thị JWT Bearer Auth
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -37,8 +39,12 @@ def custom_openapi():
             "bearerFormat": "JWT"
         }
     }
-    openapi_schema["security"] = [{"BearerAuth": []}]
+    # ✅ Tự thêm yêu cầu xác thực cho tất cả route trừ login, register
+    for path, methods in openapi_schema["paths"].items():
+        for method in methods.values():
+            if path not in ["/api/v1/login", "/api/v1/register"]:
+                method["security"] = [{"BearerAuth": []}]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-app.openapi = custom_openapi 
+app.openapi = custom_openapi

@@ -1,4 +1,7 @@
-# scripts/create_admin.py
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from app.database import SessionLocal
 from app.models.user import User, Role
 from app.core.security import get_password_hash
@@ -19,6 +22,8 @@ existing = db.query(User).filter_by(email=admin_email).first()
 if not existing:
     admin_user = User(
         username="admin",
+        fullname="Admin FIS",
+        phone="+84123456",
         email=admin_email,
         hashed_password=get_password_hash("admin123"),
         role_id=admin_role.id,

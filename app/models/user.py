@@ -13,9 +13,12 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
+    fullname = Column(String(100), nullable=False)
+    phone = Column(String(50), unique=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     is_active = Column(Boolean, default=True)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
 
     role = relationship("Role", back_populates="users")
+    chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")

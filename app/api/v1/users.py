@@ -12,7 +12,7 @@ from app.database import get_db
 from app.core.dependencies import require_role, require_admin
 from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["Admin"])
 
 @router.get("/me")
 def get_my_info(user = Depends(require_role(UserRole.admin, UserRole.reviewer, UserRole.uploader))):
@@ -33,6 +33,8 @@ def read_users(
         UserOut(
             id=u.id,
             username=u.username,
+            fullname=u.fullname,
+            phone=u.phone,
             email=u.email,
             role = UserRole(u.role.name.lower()),
             is_active=u.is_active,

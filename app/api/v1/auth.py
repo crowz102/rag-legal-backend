@@ -10,7 +10,7 @@ from app.core.security import verify_password, create_access_token, get_password
 from app.schemas.user import UserCreate
 from app.models.user import User, Role
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(prefix="/auth", tags=["Authenticate"])
 
 def get_db():
     db = SessionLocal()
@@ -36,6 +36,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     hashed_pw = get_password_hash(user.password)
     new_user = User(
         username=username,
+        fullname=user.fullname,
+        phone=user.phone,
         hashed_password=hashed_pw,
         email=user.email,
         role_id=default_role.id
