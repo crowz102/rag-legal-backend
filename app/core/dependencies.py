@@ -51,7 +51,8 @@ def require_role(*allowed_roles: UserRole):
     return role_checker
 
 def require_admin(current_user: User = Depends(get_current_user)):
-    if current_user.role != UserRole.admin:
+    role_value = getattr(current_user.role, "name", current_user.role)
+    if role_value.lower() != UserRole.admin.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required"

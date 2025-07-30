@@ -11,7 +11,8 @@ from app.models.chat import ChatSession, ChatMessage
 from app.models.user import User
 from app.core.dependencies import get_current_user
 
-from app.schemas.chat import ChatSessionSummary
+from app.schemas.chat import ChatSessionSummary, ChatSessionRenameRequest
+from app.utils import generate_session_title
 
 settings = get_settings()
 router = APIRouter(prefix="/chat", tags=["Chats"])
@@ -59,24 +60,25 @@ async def call_rag_backend(payload: QueryInput) -> RAGResponse:
 
 # ==== POST /chat/ - Gửi tin nhắn và lưu DB + gọi AI ====
 
+
 @router.post("/", response_model=ChatMessageResponse)
 async def chat(
     message_in: ChatMessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Nếu chưa có session_id thì tạo session mới
+    is_new_session = False
     if not message_in.session_id:
         session = ChatSession(user_id=current_user.id, title="Untitled")
         db.add(session)
         db.commit()
         db.refresh(session)
+        is_new_session = True
     else:
         session = db.query(ChatSession).filter_by(id=message_in.session_id, user_id=current_user.id).first()
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-    # Lưu tin nhắn người dùng
     user_msg = ChatMessage(
         session_id=session.id,
         sender="user",
@@ -87,11 +89,10 @@ async def chat(
     db.commit()
     db.refresh(user_msg)
 
-    # Gọi AI
+    # Gọi AI backend
     rag_input = QueryInput(question=message_in.content)
     rag_response = await call_rag_backend(rag_input)
 
-    # Lưu tin nhắn bot
     bot_msg = ChatMessage(
         session_id=session.id,
         sender="bot",
@@ -101,6 +102,13 @@ async def chat(
     db.add(bot_msg)
     db.commit()
     db.refresh(bot_msg)
+
+    # Nếu là session mới, sinh tiêu đề tự động từ user + bot message
+    if is_new_session:
+        title = await generate_session_title([rag_response.answer])
+        session.title = title or "Untitled"
+        db.add(session)
+        db.commit()
 
     return ChatMessageResponse(
         session_id=session.id,
@@ -146,4 +154,43 @@ async def get_chat_history(
         ) for msg in messages
     ]
 
+# ==== PATCH /chat/session/{session_id} - Sửa tên đoạn chat ====
+@router.patch("/session/{session_id}")
+def rename_session(
+    session_id: int,
+    request: ChatSessionRenameRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
 
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.title = request.title
+    db.commit()
+    return {"message": "Session renamed successfully"}
+
+# ==== DELETE /chat/session/{session_id} - Xoá đoạn chat ====
+@router.delete("/session/{session_id}")
+def delete_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    db.query(ChatMessage).filter(ChatMessage.session_id == session_id).delete()
+
+    db.delete(session)
+    db.commit()
+    return {"message": "Session deleted successfully"}

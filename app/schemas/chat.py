@@ -57,3 +57,6 @@ class ChatSessionSummary(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ChatSessionRenameRequest(BaseModel):
+    title: str

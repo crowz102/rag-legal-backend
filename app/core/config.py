@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     #AI API
     AI_API_URL: str
 
+    # SUMMARY TILTE API
+    GROQ_API: str
+
     # JWT
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
