@@ -105,7 +105,7 @@ async def chat(
 
     # Nếu là session mới, sinh tiêu đề tự động từ user + bot message
     if is_new_session:
-        title = await generate_session_title([rag_response.answer])
+        title = await generate_session_title([message_in.content])
         session.title = title or "Untitled"
         db.add(session)
         db.commit()
