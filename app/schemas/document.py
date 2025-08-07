@@ -14,13 +14,12 @@ class DocumentCreate(BaseModel):
 class DocumentOut(BaseModel):
     id: int
     uploader_id: int
-    reviewer_id: Optional[int]
-    doc_url: str
-    filename: str
+    reviewer_id: Optional[int] 
+    status: str
     type: str
+    filename: str
     issuer_agency: str
     document_type: str
-    status: DocumentStatus
 
     class Config:
         orm_mode = True

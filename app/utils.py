@@ -1,4 +1,3 @@
-# app/utils.py
 from typing import List
 import os, re
 import httpx
@@ -64,3 +63,5 @@ async def generate_session_title(messages: List[str]) -> str:
         return title or _simple_title_fallback(messages)
     except Exception:
         return _simple_title_fallback(messages)
+
+

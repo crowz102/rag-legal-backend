@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base
+from sqlalchemy.dialects.postgresql import BYTEA
 import enum
 
 class DocumentStatus(str, enum.Enum):
@@ -16,7 +17,7 @@ class Document(Base):
     reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     filename = Column(String, nullable=False)
-    doc_url = Column(String, nullable=False)
+    file_content = Column(BYTEA, nullable=True)
     status = Column(Enum(DocumentStatus), default=DocumentStatus.pending)
     type = Column(String, nullable=True)
     issuer_agency = Column(String, nullable=True)
