@@ -16,6 +16,9 @@ app.include_router(chats.router)
 app.include_router(admin.router)
 app.include_router(documents.router)
 
+from app.api.v1 import tasks as tasks_api
+app.include_router(tasks_api.router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,7 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Custom OpenAPI để hiển thị JWT Bearer Auth
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -41,7 +43,6 @@ def custom_openapi():
             "bearerFormat": "JWT"
         }
     }
-    # ✅ Tự thêm yêu cầu xác thực cho tất cả route trừ login, register
     for path, methods in openapi_schema["paths"].items():
         for method in methods.values():
             if path not in ["/api/v1/login", "/api/v1/register"]:

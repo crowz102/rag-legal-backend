@@ -14,6 +14,11 @@ def _simple_title_fallback(messages: List[str]) -> str:
     title = " ".join(words[:10]).strip(" .,:;!?-")
     return title or "Untitled"
 
+def capitalize_first_letter(text: str) -> str:
+    if not text:
+        return text
+    return text[0].upper() + text[1:]
+
 async def generate_session_title(messages: List[str]) -> str:
     """
     Gọi GROQ để sinh tiêu đề (~10 từ). Nếu lỗi -> fallback đơn giản.
@@ -21,14 +26,14 @@ async def generate_session_title(messages: List[str]) -> str:
     """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return _simple_title_fallback(messages)
+        return capitalize_first_letter(_simple_title_fallback(messages))
 
     prompt = (
-        "Dưới đây là một đoạn hội thoại giữa người dùng và trợ lý AI trong lĩnh vực pháp luật.\n"
-        "Hãy tạo MỘT tiêu đề ngắn gọn, tiếng Việt, khoảng 8–12 từ, phản ánh đúng nội dung trao đổi.\n"
-        "Không dùng ngoặc kép, không thêm dấu chấm cuối dòng.\n"
-        "Tiêu đề cần rõ ràng, súc tích, phù hợp để người dùng dễ tìm lại nội dung về sau.\n\n"
-        f"Nội dung:\n{chr(10).join(messages[:5])}\n\n"
+        "Bạn là AI chuyên tạo tiêu đề ngắn gọn cho đoạn hội thoại pháp luật.\n"
+        "Tiêu đề chỉ gồm 8–12 từ, rõ ràng, súc tích, không dùng dấu chấm cuối.\n"
+        "Chỉ trả về tiêu đề, không giải thích.\n\n"
+        "Dưới đây là nội dung hội thoại:\n"
+        f"{chr(10).join(messages[:5])}\n\n"
         "Tiêu đề:"
     )
 
@@ -60,8 +65,12 @@ async def generate_session_title(messages: List[str]) -> str:
             title = " ".join(words[:12])
         if len(title) > 80:
             title = title[:80].rstrip()
-        return title or _simple_title_fallback(messages)
+        
+        if title:
+            title = capitalize_first_letter(title)
+        else:
+            title = capitalize_first_letter(_simple_title_fallback(messages))
+
+        return title
     except Exception:
-        return _simple_title_fallback(messages)
-
-
+        return capitalize_first_letter(_simple_title_fallback(messages))

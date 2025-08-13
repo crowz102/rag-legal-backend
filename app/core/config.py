@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    CHAT_MAX_SYNC_WORDS: int 
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

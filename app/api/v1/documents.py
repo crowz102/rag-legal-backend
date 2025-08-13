@@ -3,17 +3,17 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.document import Document, DocumentStatus
+
 from app.schemas.document import DocumentOut
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from typing import List
 from app.services.content_service import parse_file_content, convert_doc_to_pdf
-import os
-import shutil
-import uuid
-import mimetypes
-import tempfile
+
+import os, tempfile, mimetypes, uuid, shutil
 from pathlib import Path
+from app.core.celery_app import celery_app
+from app.tasks.document_tasks import process_document_task
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -42,12 +42,6 @@ def upload_document(
     if len(file_content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file.filename) as temp_file:
-        temp_file.write(file_content)
-        temp_file_path = temp_file.name
-        extracted_text = parse_file_content(temp_file_path)
-    os.unlink(temp_file_path)
-
     new_doc = Document(
         uploader_id=current_user.id,
         filename=file.filename,
@@ -60,6 +54,13 @@ def upload_document(
     db.add(new_doc)
     db.commit()
     db.refresh(new_doc)
+
+    temp_file_path = os.path.join(tempfile.gettempdir(), f"{new_doc.id}_{file.filename}")
+    with open(temp_file_path, "wb") as f:
+        f.write(file_content)
+
+    process_document_task.delay(temp_file_path, new_doc.id)
+
     return new_doc
 
 @router.get("/pending", response_model=List[DocumentOut])
@@ -70,7 +71,7 @@ def get_pending_documents(
     return db.query(Document).filter(Document.status == DocumentStatus.pending).all()
 
 @router.get("/{doc_id}/preview")
-def preview_document(
+async def preview_document(
     doc_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(is_reviewer),
@@ -100,7 +101,6 @@ def preview_document(
         else:
             file_path = temp_file_path
 
-        # Kiểm tra file tồn tại ngay trước khi trả về
         if not os.path.exists(file_path):
             raise HTTPException(status_code=500, detail=f"File not found at {file_path} before sending")
 
@@ -108,8 +108,7 @@ def preview_document(
         if not mime_type:
             mime_type = "application/octet-stream"
 
-        # Sử dụng FileResponse và giữ file cho đến khi hoàn tất
-        def cleanup():
+        async def cleanup():
             for path in [temp_file_path, locals().get('converted_path')]:
                 if path and os.path.exists(path):
                     os.unlink(path)
@@ -117,13 +116,11 @@ def preview_document(
         response = FileResponse(
             path=file_path,
             filename=doc.filename,
-            media_type=mime_type
+            media_type=mime_type,
+            background=cleanup
         )
-        # Đăng ký cleanup sau khi response hoàn tất
-        response.background = cleanup
         return response
     except Exception as e:
-        # Xóa file nếu có lỗi
         for path in [temp_file_path, locals().get('converted_path')]:
             if path and os.path.exists(path):
                 os.unlink(path)
