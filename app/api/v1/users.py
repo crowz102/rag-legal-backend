@@ -23,7 +23,7 @@ def get_my_info(user = Depends(require_role(UserRole.admin, UserRole.reviewer, U
 def admin_only_route(user = Depends(require_role(UserRole.admin))):
     return {"msg": f"Welcome admin {user.username}!"}
 
-# --------------------- CRUD User cho Admin --------------------------------
+# --------------------- CRUD User for Admin --------------------------------
 @router.get("/", response_model=list[UserOut])
 def read_users(
     db: Session = Depends(get_db),

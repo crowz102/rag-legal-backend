@@ -10,7 +10,7 @@ from app.models.user import User
 from typing import List
 from app.services.content_service import parse_file_content, convert_doc_to_pdf
 
-import os, tempfile, mimetypes, uuid, shutil
+import os, tempfile, mimetypes
 from pathlib import Path
 from app.core.celery_app import celery_app
 from app.tasks.document_tasks import process_document_task
@@ -19,16 +19,21 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 
 UPLOAD_DIR = os.path.join("rag-legal-backend", "uploads")
 
+
+# -------------------- DEPENDENCIES -------------------- #
 def is_uploader(user: User = Depends(get_current_user)):
-    if user.role.name.lower() != "uploader":
+    if not user or not user.role or user.role.name.lower() != "uploader":
         raise HTTPException(status_code=403, detail="Uploaders only")
     return user
 
+
 def is_reviewer(user: User = Depends(get_current_user)):
-    if user.role.name.lower() != "reviewer":
+    if not user or not user.role or user.role.name.lower() != "reviewer":
         raise HTTPException(status_code=403, detail="Reviewers only")
     return user
 
+
+# -------------------- UPLOAD -------------------- #
 @router.post("/upload", response_model=DocumentOut)
 def upload_document(
     file: UploadFile = File(...),
@@ -59,10 +64,13 @@ def upload_document(
     with open(temp_file_path, "wb") as f:
         f.write(file_content)
 
+    # Gửi task xử lý document
     process_document_task.delay(temp_file_path, new_doc.id)
 
     return new_doc
 
+
+# -------------------- PENDING -------------------- #
 @router.get("/pending", response_model=List[DocumentOut])
 def get_pending_documents(
     db: Session = Depends(get_db),
@@ -70,6 +78,8 @@ def get_pending_documents(
 ):
     return db.query(Document).filter(Document.status == DocumentStatus.pending).all()
 
+
+# -------------------- PREVIEW -------------------- #
 @router.get("/{doc_id}/preview")
 async def preview_document(
     doc_id: int,
@@ -85,13 +95,12 @@ async def preview_document(
         raise HTTPException(status_code=404, detail="File content not found")
 
     temp_file_path = tempfile.NamedTemporaryFile(delete=False, suffix=doc.type).name
+    converted_path = None
     try:
         with open(temp_file_path, 'wb') as temp_file:
             temp_file.write(file_content)
             temp_file.flush()
             os.fsync(temp_file.fileno())
-        if not os.path.exists(temp_file_path):
-            raise HTTPException(status_code=500, detail=f"Failed to create temporary file at {temp_file_path}")
 
         if doc.type.lower() == ".doc":
             converted_path = convert_doc_to_pdf(Path(temp_file_path))
@@ -109,23 +118,25 @@ async def preview_document(
             mime_type = "application/octet-stream"
 
         async def cleanup():
-            for path in [temp_file_path, locals().get('converted_path')]:
+            for path in [temp_file_path, converted_path]:
                 if path and os.path.exists(path):
                     os.unlink(path)
 
-        response = FileResponse(
+        return FileResponse(
             path=file_path,
             filename=doc.filename,
             media_type=mime_type,
             background=cleanup
         )
-        return response
+
     except Exception as e:
-        for path in [temp_file_path, locals().get('converted_path')]:
+        for path in [temp_file_path, converted_path]:
             if path and os.path.exists(path):
                 os.unlink(path)
         raise
 
+
+# -------------------- APPROVE -------------------- #
 @router.put("/{doc_id}/approve", response_model=DocumentOut)
 def approve_document(
     doc_id: int,
@@ -135,12 +146,20 @@ def approve_document(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc or doc.status != DocumentStatus.pending:
         raise HTTPException(status_code=404, detail="Document not found or not pending")
+
+    # Debug
+    print(f"[DEBUG] Approving document {doc.id} by reviewer {current_user.id} ({current_user.role.name})")
+
     doc.status = DocumentStatus.approved
     doc.reviewer_id = current_user.id
+
+    db.add(doc)
     db.commit()
     db.refresh(doc)
     return doc
 
+
+# -------------------- REJECT -------------------- #
 @router.put("/{doc_id}/reject", response_model=DocumentOut)
 def reject_document(
     doc_id: int,
@@ -150,8 +169,14 @@ def reject_document(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc or doc.status != DocumentStatus.pending:
         raise HTTPException(status_code=404, detail="Document not found or not pending")
+
+    # Debug
+    print(f"[DEBUG] Rejecting document {doc.id} by reviewer {current_user.id} ({current_user.role.name})")
+
     doc.status = DocumentStatus.rejected
     doc.reviewer_id = current_user.id
+
+    db.add(doc)
     db.commit()
     db.refresh(doc)
     return doc
