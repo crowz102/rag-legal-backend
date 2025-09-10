@@ -46,6 +46,7 @@ Dự án hướng tới việc xây dựng một nền tảng quản lý và kha
 ## ⚡ Cách chạy dự án
 
 ### 1. Cài đặt môi trường
+```bash
 git clone https://github.com/your-org/rag-legal-backend.git
 cd rag-legal-backend
 python -m venv venv
@@ -55,13 +56,17 @@ pip install -r requirements.txt
 
 ### 2. Cấu hình môi trường
 Tạo file `.env` với nội dung ví dụ:
+```env
 DATABASE_URL=mysql+pymysql://user:password@localhost/rag_legal_db
 SECRET_KEY=your_secret_key
 RABBITMQ_URL=amqp://guest:guest@localhost:5672//
 
 ### 3. Chạy FastAPI
+```bash
 uvicorn main:app --reload
+
 Truy cập tại: http://localhost:8000/docs
 
 ### 4. Chạy Celery worker
+```bash
 celery -A app.core.celery_app worker --loglevel=info
