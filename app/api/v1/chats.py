@@ -12,7 +12,7 @@ from app.models.user import User
 from app.core.dependencies import get_current_user
 from app.schemas.chat import ChatSessionSummary, ChatSessionRenameRequest
 from app.utils import generate_session_title
-from app.tasks.chat_tasks import call_ai_task
+from app.tasks.chat_tasks import fetch_ai_task
 
 settings = get_settings()
 router = APIRouter(prefix="/chat", tags=["Chats"])
@@ -46,10 +46,6 @@ class FullChatMessage(BaseModel):
 
 # ==== Helper: decide sync/async ====
 def should_use_async(question: str, settings) -> bool:
-    """
-    Trả về True nếu nên xử lý async.
-    Logic: nếu số từ > CHAT_MAX_SYNC_WORDS trong config thì async.
-    """
     max_sync_words = settings.CHAT_MAX_SYNC_WORDS
     word_count = len(question.split())
     return word_count > max_sync_words
@@ -66,7 +62,7 @@ async def call_rag_backend(payload: QueryInput) -> RAGResponse:
         print("❌ Lỗi khi gọi AI backend:\n", traceback.format_exc())
         raise HTTPException(status_code=500, detail="Lỗi kết nối AI backend")
 
-# ==== POST /chat/ (Luôn async khi muốn test Celery) ====
+# ==== POST /chat/ (alway async to Celery orchestrator) ====
 @router.post("/", response_model=dict)
 async def chat(
     message_in: ChatMessageCreate,
@@ -89,6 +85,7 @@ async def chat(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+    # Save messages user
     user_msg = ChatMessage(
         session_id=session.id,
         sender="user",
@@ -104,15 +101,17 @@ async def chat(
         "chat_history": []
     }
 
-    # Luôn gửi Celery task để test async
-    async_result = call_ai_task.apply_async(args=[payload], queue="celery")
-    print(f"[DEBUG] Sent Celery task_id={async_result.id}")
+    # Send Celery orchestrator task
+    async_result = fetch_ai_task.apply_async(args=[payload], queue="celery")
+    print(f"[DEBUG] Sent Celery fetch_ai task_id={async_result.id}")
+
     response = {
         "session_id": session.id,
         "task_id": async_result.id,
         "mode": "async"
     }
 
+    # New sessions => auto create name
     if is_new_session:
         title = await generate_session_title([message_in.content])
         session.title = title or "Untitled"
@@ -120,7 +119,6 @@ async def chat(
         db.commit()
 
     return response
-
 
 # ==== GET /chat/sessions ====
 @router.get("/sessions", response_model=List[ChatSessionSummary])

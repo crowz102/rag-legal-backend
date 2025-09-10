@@ -26,6 +26,13 @@ celery_app.conf.update(
     task_default_queue="celery",
     worker_hijack_root_logger=False,
     task_always_eager=False,
-    worker_send_task_events=True, 
-    task_send_sent_event=True,     
+    worker_send_task_events=True,
+    task_send_sent_event=True,
+
+    # Timeout / ổn định kết nối / QoS
+    task_time_limit=600,
+    task_soft_time_limit=540,
+    broker_connection_retry_on_startup=True,
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
 )
