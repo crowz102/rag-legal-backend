@@ -38,7 +38,7 @@ Dự án hướng tới việc xây dựng một nền tảng quản lý và kha
 - SQLAlchemy – ORM quản lý DB.  
 - Celery – Task queue.  
 - RabbitMQ – Message broker.  
-- Redis (dự kiến tích hợp) – Caching & rate limiting.  
+- Redis – Caching & rate limiting.  
 - Docker (dự kiến triển khai) – Container hóa.  
 
 ---
