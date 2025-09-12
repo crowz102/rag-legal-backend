@@ -12,7 +12,9 @@ from app.models.user import User
 from app.core.dependencies import get_current_user
 from app.schemas.chat import ChatSessionSummary, ChatSessionRenameRequest
 from app.utils import generate_session_title
-from app.tasks.chat_tasks import fetch_ai_task
+
+from app.tasks.chat_tasks import call_ai_task
+# from app.tasks.chat_tasks import fetch_ai_task
 
 settings = get_settings()
 router = APIRouter(prefix="/chat", tags=["Chats"])
@@ -102,7 +104,7 @@ async def chat(
     }
 
     # Send Celery orchestrator task
-    async_result = fetch_ai_task.apply_async(args=[payload], queue="celery")
+    async_result = call_ai_task.apply_async(args=[payload], queue="celery")
     print(f"[DEBUG] Sent Celery fetch_ai task_id={async_result.id}")
 
     response = {
